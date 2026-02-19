@@ -1,0 +1,1695 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0d1b2a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Gastos">
+    <link rel="manifest" href="manifest.json">
+    <title>Control de Gastos</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; -webkit-tap-highlight-color: transparent; }
+
+        :root {
+            --accent: #3b82f6;
+            --accent-glow: rgba(59,130,246,0.3);
+            --bg: #0d1b2a;
+            --surface: #1a2a3a;
+            --surface2: #223344;
+            --text: #e8f0fe;
+            --text-muted: rgba(232,240,254,0.45);
+            --positive: #00e5a0;
+            --negative: #ff4560;
+        }
+
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'SF Pro Display', sans-serif;
+            background: var(--bg);
+            color: var(--text);
+            overflow: hidden;
+            height: 100vh;
+            -webkit-font-smoothing: antialiased;
+        }
+
+        /* PROFILE SWITCHER */
+        .profiles-bar {
+            display: flex;
+            align-items: center;
+            justify-content: center;
+            padding: 10px 12px;
+            gap: 6px;
+            background: rgba(0,0,0,0.3);
+            border-bottom: 1px solid rgba(255,255,255,0.06);
+            position: relative;
+            z-index: 100;
+            padding-top: calc(10px + env(safe-area-inset-top));
+        }
+        .profiles-bar::-webkit-scrollbar { display: none; }
+
+        .profile-pill {
+            display: flex;
+            align-items: center;
+            gap: 5px;
+            padding: 6px 10px;
+            border-radius: 18px;
+            font-size: 12px;
+            font-weight: 600;
+            cursor: pointer;
+            border: 1.5px solid transparent;
+            white-space: nowrap;
+            transition: all 0.25s;
+            background: rgba(255,255,255,0.05);
+            color: rgba(255,255,255,0.45);
+            flex-shrink: 0;
+        }
+
+        .profile-pill.active {
+            color: white;
+            border-color: var(--accent);
+            background: var(--accent-glow);
+        }
+
+        .profile-dot {
+            width: 7px; height: 7px;
+            border-radius: 50%;
+        }
+
+        /* MAIN SWIPE CONTAINER */
+        .swipe-container {
+            display: flex;
+            width: 400%;
+            height: calc(100vh - 56px - env(safe-area-inset-top));
+            transition: transform 0.35s cubic-bezier(0.25, 0.46, 0.45, 0.94);
+        }
+
+        .profile-screen {
+            width: 25%;
+            height: 100%;
+            overflow-y: auto;
+            overflow-x: hidden;
+            scrollbar-width: none;
+            flex-shrink: 0;
+        }
+        .profile-screen::-webkit-scrollbar { display: none; }
+
+        /* NAV TABS */
+        .nav-tabs {
+            display: flex;
+            padding: 12px 16px;
+            gap: 8px;
+            background: rgba(0,0,0,0.2);
+            position: sticky;
+            top: 0;
+            z-index: 50;
+            backdrop-filter: blur(10px);
+        }
+
+        .nav-tab {
+            flex: 1;
+            padding: 11px;
+            text-align: center;
+            border-radius: 10px;
+            font-size: 13px;
+            font-weight: 600;
+            cursor: pointer;
+            border: none;
+            background: rgba(255,255,255,0.05);
+            color: rgba(255,255,255,0.4);
+            transition: all 0.2s;
+        }
+
+        .nav-tab.active {
+            color: white;
+        }
+
+        /* VIEWS */
+        .view { display: none; }
+        .view.active { display: block; }
+
+        /* HEADER */
+        .month-header {
+            padding: 18px 18px 22px;
+            background: rgba(0,0,0,0.15);
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+
+        .month-selector {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 22px;
+        }
+
+        .month-arrow {
+            width: 34px; height: 34px;
+            border-radius: 9px;
+            background: rgba(255,255,255,0.06);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 16px; cursor: pointer; border: none; color: white;
+            transition: all 0.15s;
+        }
+        .month-arrow:active { transform: scale(0.9); background: rgba(255,255,255,0.12); }
+
+        .month-label {
+            font-size: 11px;
+            font-weight: 700;
+            letter-spacing: 2.5px;
+            text-transform: uppercase;
+            padding: 7px 14px;
+            border-radius: 7px;
+            background: rgba(255,255,255,0.07);
+            color: rgba(255,255,255,0.7);
+        }
+
+        .balance-block { text-align: center; margin-bottom: 22px; }
+
+        .balance-lbl {
+            font-size: 10px;
+            letter-spacing: 2px;
+            text-transform: uppercase;
+            color: var(--text-muted);
+            margin-bottom: 10px;
+        }
+
+        .balance-num {
+            font-size: 48px;
+            font-weight: 200;
+            letter-spacing: -2px;
+            line-height: 1;
+            margin-bottom: 9px;
+            transition: color 0.3s;
+        }
+
+        .balance-change {
+            font-size: 13px;
+            font-weight: 400;
+        }
+
+        .stats-row {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+            margin-bottom: 12px;
+        }
+
+        .stat-card {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 12px;
+            padding: 13px;
+        }
+
+        .stat-lbl {
+            font-size: 9px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            margin-bottom: 5px;
+        }
+
+        .stat-val {
+            font-size: 17px;
+            font-weight: 300;
+            letter-spacing: -0.5px;
+        }
+
+        .stat-bar {
+            width: 100%; height: 2px;
+            background: rgba(255,255,255,0.08);
+            border-radius: 1px;
+            margin-top: 8px;
+            overflow: hidden;
+        }
+
+        .stat-bar-fill {
+            height: 100%;
+            border-radius: 1px;
+            transition: width 0.4s ease;
+        }
+
+        .savings-card {
+            border-radius: 12px;
+            padding: 13px 16px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.08);
+        }
+
+        .savings-pct {
+            font-size: 26px;
+            font-weight: 300;
+            letter-spacing: -1px;
+        }
+
+        .savings-amt {
+            font-size: 14px;
+            color: var(--text-muted);
+            font-weight: 300;
+        }
+
+        /* CONTENT */
+        .content {
+            padding: 18px;
+            padding-bottom: 80px;
+        }
+
+        .section-hdr {
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            margin-bottom: 14px;
+        }
+
+        .section-title {
+            font-size: 16px;
+            font-weight: 600;
+            letter-spacing: -0.3px;
+        }
+
+        .section-total {
+            font-size: 15px;
+            font-weight: 300;
+        }
+
+        .expense-row {
+            display: flex;
+            align-items: center;
+            padding: 13px 0;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            cursor: pointer;
+            transition: opacity 0.15s;
+        }
+        .expense-row:active { opacity: 0.7; }
+
+        .exp-icon {
+            width: 38px; height: 38px;
+            border-radius: 10px;
+            background: rgba(255,255,255,0.06);
+            display: flex; align-items: center; justify-content: center;
+            font-size: 19px;
+            margin-right: 12px;
+            flex-shrink: 0;
+        }
+
+        .exp-info { flex: 1; min-width: 0; }
+        .exp-name { font-size: 14px; font-weight: 300; color: rgba(255,255,255,0.85); margin-bottom: 2px; }
+        .exp-pct { font-size: 10px; color: var(--text-muted); }
+        .exp-amount { font-size: 14px; font-weight: 300; color: rgba(255,255,255,0.55); flex-shrink: 0; }
+
+        .divider { height: 1px; background: rgba(255,255,255,0.05); margin: 24px 0; }
+
+        .other-row {
+            display: flex;
+            align-items: center;
+            padding: 12px 13px;
+            background: rgba(255,255,255,0.025);
+            border-radius: 10px;
+            margin-bottom: 7px;
+            cursor: pointer;
+        }
+        .other-row:active { opacity: 0.7; }
+        .other-name { flex: 1; font-size: 14px; color: rgba(255,255,255,0.7); font-weight: 300; margin-right: 10px; }
+        .other-amt { font-size: 14px; font-weight: 300; color: rgba(255,255,255,0.55); flex-shrink: 0; }
+
+        .del-btn {
+            background: #ff4560;
+            color: white; border: none;
+            width: 26px; height: 26px;
+            border-radius: 6px;
+            font-size: 15px;
+            cursor: pointer;
+            margin-left: 8px;
+            display: flex; align-items: center; justify-content: center;
+            flex-shrink: 0;
+        }
+
+        .add-btn {
+            width: 100%;
+            padding: 14px;
+            background: transparent;
+            border: 1.5px dashed rgba(255,255,255,0.15);
+            border-radius: 11px;
+            color: rgba(255,255,255,0.4);
+            font-size: 14px;
+            font-weight: 500;
+            cursor: pointer;
+            margin-top: 10px;
+            margin-bottom: 80px;
+            transition: all 0.2s;
+        }
+        .add-btn:active { border-color: var(--accent); color: var(--accent); }
+
+        /* EMOJI PICKER */
+        .emoji-grid {
+            display: grid;
+            grid-template-columns: repeat(7, 1fr);
+            gap: 6px;
+            margin-bottom: 14px;
+            max-height: 160px;
+            overflow-y: auto;
+        }
+
+        .emoji-opt {
+            width: 38px; height: 38px;
+            border-radius: 8px;
+            background: rgba(255,255,255,0.05);
+            border: 2px solid transparent;
+            display: flex; align-items: center; justify-content: center;
+            font-size: 20px;
+            cursor: pointer;
+            transition: all 0.15s;
+        }
+
+        .emoji-opt.selected {
+            border-color: var(--accent);
+            background: var(--accent-glow);
+        }
+
+        .empty { text-align: center; padding: 30px; color: var(--text-muted); font-size: 14px; }
+
+        /* ANNUAL VIEW */
+        .annual-hdr {
+            padding: 24px 18px;
+            background: rgba(0,0,0,0.15);
+            border-bottom: 1px solid rgba(255,255,255,0.04);
+        }
+
+        .annual-title {
+            font-size: 28px;
+            font-weight: 700;
+            letter-spacing: -1px;
+            text-align: center;
+            margin-bottom: 20px;
+        }
+
+        .annual-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            gap: 10px;
+        }
+
+        .annual-card {
+            background: rgba(255,255,255,0.04);
+            border: 1px solid rgba(255,255,255,0.06);
+            border-radius: 13px;
+            padding: 16px;
+            text-align: center;
+        }
+
+        .annual-lbl {
+            font-size: 10px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1.2px;
+            margin-bottom: 7px;
+        }
+
+        .annual-val { font-size: 20px; font-weight: 300; letter-spacing: -0.5px; }
+
+        .chart-section { padding: 18px; }
+        .chart-title { font-size: 15px; font-weight: 600; margin-bottom: 14px; }
+
+        .chart-wrap {
+            background: rgba(255,255,255,0.025);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 13px;
+            padding: 18px 14px 34px;
+            margin-bottom: 20px;
+            position: relative;
+        }
+
+        .bar-chart {
+            height: 160px;
+            display: flex;
+            align-items: flex-end;
+            gap: 5px;
+        }
+
+        .bar {
+            flex: 1;
+            border-radius: 5px 5px 0 0;
+            min-height: 4px;
+            position: relative;
+            transition: height 0.3s ease;
+        }
+
+        .bar-lbl {
+            position: absolute;
+            bottom: -22px;
+            left: 50%;
+            transform: translateX(-50%);
+            font-size: 9px;
+            color: var(--text-muted);
+        }
+
+        .table-wrap {
+            background: rgba(255,255,255,0.025);
+            border: 1px solid rgba(255,255,255,0.05);
+            border-radius: 13px;
+            overflow: hidden;
+            margin-bottom: 80px;
+        }
+
+        .t-row {
+            display: grid;
+            grid-template-columns: 1.5fr 1fr 1fr 1fr;
+            padding: 12px 14px;
+            border-bottom: 1px solid rgba(255,255,255,0.03);
+            font-size: 12px;
+        }
+
+        .t-row.t-head {
+            font-size: 10px;
+            color: var(--text-muted);
+            text-transform: uppercase;
+            letter-spacing: 1px;
+            font-weight: 600;
+            background: rgba(255,255,255,0.03);
+        }
+
+        .t-row:last-child { border-bottom: none; }
+        .t-cell { color: rgba(255,255,255,0.65); }
+        .t-cell.pos { color: var(--positive); }
+        .t-cell.neg { color: var(--negative); }
+
+        /* MODAL */
+        .modal-overlay {
+            position: fixed; inset: 0;
+            background: rgba(0,0,0,0.75);
+            display: none; align-items: center; justify-content: center;
+            z-index: 500;
+            backdrop-filter: blur(6px);
+        }
+        .modal-overlay.show { display: flex; }
+
+        .modal-box {
+            background: #1a2a3a;
+            border-radius: 20px;
+            padding: 24px;
+            width: 88%;
+            max-width: 380px;
+            box-shadow: 0 24px 60px rgba(0,0,0,0.5);
+        }
+
+        .modal-title {
+            font-size: 17px;
+            font-weight: 600;
+            margin-bottom: 18px;
+        }
+
+        .modal-input {
+            width: 100%;
+            background: #0d1b2a;
+            border: 2px solid rgba(255,255,255,0.1);
+            border-radius: 11px;
+            padding: 14px;
+            font-size: 22px;
+            color: white;
+            text-align: center;
+            font-weight: 300;
+            margin-bottom: 12px;
+            transition: border-color 0.2s;
+        }
+
+        .modal-input:focus { outline: none; border-color: var(--accent); }
+        .modal-input-sm {
+            font-size: 15px;
+            text-align: left;
+            margin-bottom: 12px;
+        }
+
+        .modal-btns { display: flex; gap: 10px; }
+
+        .modal-btn {
+            flex: 1; padding: 14px;
+            border-radius: 11px; border: none;
+            font-size: 15px; font-weight: 600;
+            cursor: pointer; transition: all 0.15s;
+        }
+
+        .modal-btn:active { transform: scale(0.97); }
+        .btn-cancel { background: rgba(255,255,255,0.08); color: white; }
+        .btn-save { color: white; }
+
+        /* SWIPE INDICATOR */
+        .swipe-hint {
+            position: fixed;
+            bottom: 14px;
+            left: 50%;
+            transform: translateX(-50%);
+            display: flex;
+            gap: 6px;
+            z-index: 200;
+        }
+
+        .dot {
+            width: 6px; height: 6px;
+            border-radius: 50%;
+            background: rgba(255,255,255,0.2);
+            transition: all 0.25s;
+        }
+
+        .dot.active {
+            width: 20px;
+            border-radius: 3px;
+            background: var(--accent);
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+
+        @keyframes slideUp {
+            from { transform: translateY(100%); }
+            to { transform: translateY(0); }
+        }
+    </style>
+</head>
+<body>
+
+<!-- PROFILE PILLS -->
+<div class="profiles-bar" id="profilesBar"></div>
+
+<!-- SWIPE CONTAINER -->
+<div class="swipe-container" id="swipeContainer"></div>
+
+<!-- SWIPE DOTS -->
+<div class="swipe-hint" id="swipeDots"></div>
+
+<!-- MODAL -->
+<div class="modal-overlay" id="modal" onclick="closeModal(event)">
+    <div class="modal-box" onclick="event.stopPropagation()">
+        <div class="modal-title" id="modalTitle">Editar</div>
+        <div id="modalInputs"></div>
+        <div class="modal-btns">
+            <button class="modal-btn btn-cancel" onclick="closeModal()">Cancelar</button>
+            <button class="modal-btn btn-save" id="modalSave" onclick="saveModal()">Guardar</button>
+        </div>
+    </div>
+</div>
+
+<script>
+// ─── PROFILES CONFIG ───────────────────────────────────────────────
+const PROFILES = [
+    {
+        id: 'casa',
+        name: 'Casa',
+        emoji: '🏠',
+        color: '#3b82f6',
+        gradient: 'linear-gradient(135deg, #3b82f6, #8b5cf6)',
+        glow: 'rgba(59,130,246,0.25)',
+        bg: '#0d1b2a',
+        surface: '#1a2a3a',
+        hasFixed: true,
+        fixedExpenses: [
+            { emoji: '🏠', name: 'Arriendo', custom: true },
+            { emoji: '⚡', name: 'Electricidad', custom: true },
+            { emoji: '💧', name: 'Agua', custom: true },
+            { emoji: '📡', name: 'Internet', custom: true },
+            { emoji: '🛒', name: 'Mercado', custom: true },
+            { emoji: '🏢', name: 'Gasto Común', custom: true },
+            { emoji: '📱', name: 'Plan Móvil Euri', custom: true },
+            { emoji: '📞', name: 'Plan Móvil Fran', custom: true },
+            { emoji: '🥬', name: 'Feria 1', custom: true },
+            { emoji: '🥕', name: 'Feria 2', custom: true },
+            { emoji: '📺', name: 'YouTube', custom: true },
+            { emoji: '☁️', name: 'Google One Fran', custom: true },
+            { emoji: '📦', name: 'Amazon Prime', custom: true },
+            { emoji: '💧', name: 'Botellones', custom: true },
+            { emoji: '🥚', name: 'Huevos', custom: true },
+            { emoji: '📺', name: 'Apple TV', custom: true }
+        ]
+    },
+    {
+        id: 'personal',
+        name: 'Personal',
+        emoji: '👤',
+        color: '#00c896',
+        gradient: 'linear-gradient(135deg, #00c896, #a8e063)',
+        glow: 'rgba(0,200,150,0.25)',
+        bg: '#0a1a14',
+        surface: '#0f2a20',
+        hasFixed: false,
+        fixedExpenses: []
+    },
+    {
+        id: 'pareja',
+        name: 'Pareja',
+        emoji: '💑',
+        color: '#a855f7',
+        gradient: 'linear-gradient(135deg, #a855f7, #ec4899)',
+        glow: 'rgba(168,85,247,0.25)',
+        bg: '#130d1f',
+        surface: '#1e1030',
+        hasFixed: false,
+        fixedExpenses: []
+    },
+    {
+        id: 'ahorros',
+        name: 'Ahorros',
+        emoji: '💰',
+        color: '#eab308',
+        gradient: 'linear-gradient(135deg, #eab308, #fbbf24)',
+        glow: 'rgba(234,179,8,0.25)',
+        bg: '#1a1600',
+        surface: '#262100',
+        hasFixed: false,
+        isSavings: true, // Perfil especial de ahorros acumulativos
+        fixedExpenses: []
+    }
+];
+
+const MONTHS = ['ENERO','FEBRERO','MARZO','ABRIL','MAYO','JUNIO','JULIO','AGOSTO','SEPTIEMBRE','OCTUBRE','NOVIEMBRE','DICIEMBRE'];
+
+// ─── DATA ───────────────────────────────────────────────────────────
+function defaultData() {
+    const d = {};
+    PROFILES.forEach(p => {
+        d[p.id] = {
+            months: MONTHS.map((name, i) => ({
+                name,
+                incomes: [], // Array editable de ingresos
+                fixedExpenses: p.fixedExpenses.map(e => ({ ...e, amount: 0 })),
+                otherExpenses: []
+            }))
+        };
+    });
+    return d;
+}
+
+let appData;
+const saved = localStorage.getItem('gastos-app-v1');
+appData = saved ? JSON.parse(saved) : defaultData();
+
+// Migrar datos viejos al nuevo formato de ingresos
+PROFILES.forEach(p => {
+    if (appData[p.id]) {
+        appData[p.id].months.forEach(m => {
+            // Si tiene el formato viejo (incomesFran, incomesEuri, incomesExtra)
+            if (m.incomesFran !== undefined || m.incomesEuri !== undefined) {
+                // Convertir al nuevo formato (array de ingresos)
+                m.incomes = m.incomes || [];
+                if (m.incomesFran > 0) m.incomes.push({ name: 'Ingreso Fran', amount: m.incomesFran });
+                if (m.incomesEuri > 0) m.incomes.push({ name: 'Ingreso Euri', amount: m.incomesEuri });
+                if (m.incomesExtra > 0) m.incomes.push({ name: 'Ingreso Extra', amount: m.incomesExtra });
+                // Eliminar campos viejos
+                delete m.incomesFran;
+                delete m.incomesEuri;
+                delete m.incomesExtra;
+            }
+            // Asegurar que incomes existe aunque esté vacío
+            if (!m.incomes) m.incomes = [];
+        });
+    }
+});
+save(); // Guardar migración
+
+function save() { localStorage.setItem('gastos-app-v1', JSON.stringify(appData)); }
+
+// ─── STATE ──────────────────────────────────────────────────────────
+// Detectar mes y año actuales
+const now = new Date();
+const currentMonth = now.getMonth(); // 0-11, donde 0=Enero
+const currentYear = now.getFullYear(); // 2026, 2027, etc.
+let currentProfile = 0;
+let currentMonths = PROFILES.map(() => currentMonth); // Inicia en mes actual
+let activeTab = PROFILES.map(() => 'monthly');
+let modalCtx = null;
+
+// ─── FORMAT ─────────────────────────────────────────────────────────
+function fmt(n) {
+    return '$' + Math.round(n).toLocaleString('es-CL', { maximumFractionDigits: 0 });
+}
+
+// Formatear input mientras escribe (agrega puntos cada 3 dígitos)
+function formatInputValue(input) {
+    let value = input.value.replace(/\D/g, ''); // Solo números
+    if (value) {
+        value = parseInt(value, 10).toLocaleString('es-CL');
+    }
+    input.value = value;
+}
+
+// Obtener valor numérico limpio de un input formateado
+function parseInputValue(input) {
+    return parseInt(input.value.replace(/\D/g, '') || '0', 10);
+}
+
+// Aplicar formato automático a un input
+function setupFormattedInput(inputId) {
+    setTimeout(() => {
+        const input = document.getElementById(inputId);
+        if (input) {
+            // Formatear valor inicial si existe
+            if (input.value) formatInputValue(input);
+            // Formatear mientras escribe
+            input.addEventListener('input', () => formatInputValue(input));
+        }
+    }, 50);
+}
+
+// ─── CALC ────────────────────────────────────────────────────────────
+function calc(profileId, monthIdx) {
+    const profile = PROFILES.find(p => p.id === profileId);
+    const m = appData[profileId].months[monthIdx];
+    const inc = m.incomes.reduce((s, e) => s + e.amount, 0);
+    const fix = m.fixedExpenses.reduce((s, e) => s + e.amount, 0);
+    const oth = m.otherExpenses.reduce((s, e) => s + e.amount, 0);
+    const exp = fix + oth;
+    let bal = inc - exp;
+    
+    // Si es perfil de ahorros, acumular balance de meses anteriores
+    if (profile && profile.isSavings) {
+        for (let i = 0; i < monthIdx; i++) {
+            const prevMonth = appData[profileId].months[i];
+            const prevInc = prevMonth.incomes.reduce((s, e) => s + e.amount, 0);
+            const prevFix = prevMonth.fixedExpenses.reduce((s, e) => s + e.amount, 0);
+            const prevOth = prevMonth.otherExpenses.reduce((s, e) => s + e.amount, 0);
+            bal += prevInc - (prevFix + prevOth);
+        }
+    }
+    
+    const rate = inc > 0 ? (bal / inc) * 100 : 0;
+    return { inc, fix, oth, exp, bal, rate };
+}
+
+// ─── BUILD UI ────────────────────────────────────────────────────────
+function buildUI() {
+    const bar = document.getElementById('profilesBar');
+    const container = document.getElementById('swipeContainer');
+    const dots = document.getElementById('swipeDots');
+
+    bar.innerHTML = '';
+    container.innerHTML = '';
+    dots.innerHTML = '';
+
+    PROFILES.forEach((p, pi) => {
+        // Pill
+        const pill = document.createElement('div');
+        pill.className = 'profile-pill' + (pi === currentProfile ? ' active' : '');
+        pill.style.setProperty('--accent', p.color);
+        pill.innerHTML = `<span class="profile-dot" style="background:${p.color}"></span>${p.emoji} ${p.name}`;
+        pill.onclick = () => switchProfile(pi);
+        bar.appendChild(pill);
+
+        // Dot
+        const dot = document.createElement('div');
+        dot.className = 'dot' + (pi === currentProfile ? ' active' : '');
+        dot.style.background = pi === currentProfile ? p.color : '';
+        dots.appendChild(dot);
+
+        // Screen
+        const screen = document.createElement('div');
+        screen.className = 'profile-screen';
+        screen.id = `screen-${pi}`;
+        screen.style.setProperty('--accent', p.color);
+        screen.style.setProperty('--accent-glow', p.glow);
+        screen.style.background = p.bg;
+        screen.innerHTML = buildScreen(p, pi);
+        container.appendChild(screen);
+    });
+
+    updateSwipe();
+}
+
+function buildScreen(p, pi) {
+    return `
+        <div class="nav-tabs">
+            <button class="nav-tab ${activeTab[pi] === 'monthly' ? 'active' : ''}" 
+                style="${activeTab[pi] === 'monthly' ? `background:${p.gradient || p.color};` : ''}"
+                onclick="switchTab(${pi}, 'monthly')">Mes</button>
+            <button class="nav-tab ${activeTab[pi] === 'annual' ? 'active' : ''}"
+                style="${activeTab[pi] === 'annual' ? `background:${p.gradient || p.color};` : ''}"
+                onclick="switchTab(${pi}, 'annual')">Año</button>
+        </div>
+        <div id="view-monthly-${pi}" class="view ${activeTab[pi] === 'monthly' ? 'active' : ''}">
+            ${buildMonthly(p, pi)}
+        </div>
+        <div id="view-annual-${pi}" class="view ${activeTab[pi] === 'annual' ? 'active' : ''}">
+            ${buildAnnual(p, pi)}
+        </div>
+    `;
+}
+
+function buildMonthly(p, pi) {
+    const mi = currentMonths[pi];
+    const m = appData[p.id].months[mi];
+    const t = calc(p.id, mi);
+
+    const prevBal = mi > 0 ? calc(p.id, mi - 1).bal : null;
+    let changeStr = '● Primer mes';
+    let changeColor = p.color;
+    if (prevBal !== null) {
+        const diff = t.bal - prevBal;
+        const pct = prevBal !== 0 ? ((diff / Math.abs(prevBal)) * 100).toFixed(0) : 0;
+        const arrow = diff >= 0 ? '↗' : '↘';
+        changeStr = `${arrow} ${diff >= 0 ? '+' : ''}${pct}% vs ${MONTHS[mi - 1]}`;
+        changeColor = diff >= 0 ? 'var(--positive)' : 'var(--negative)';
+    }
+
+    const balColor = t.bal >= 0 ? 'var(--positive)' : 'var(--negative)';
+    const expPct = t.inc > 0 ? Math.min((t.exp / t.inc) * 100, 100) : 0;
+
+    let fixedHTML = '';
+    if (p.hasFixed) {
+        fixedHTML = `
+            <div class="section-hdr">
+                <div class="section-title">Gastos Fijos</div>
+                <div class="section-total" style="color:${p.color}">${fmt(t.fix)}</div>
+            </div>
+            ${m.fixedExpenses.map((e, ei) => {
+                const pct = t.exp > 0 ? ((e.amount / t.exp) * 100).toFixed(1) : 0;
+                const iconClick = e.custom
+                    ? `event.stopPropagation(); iconMenu(${pi},${ei})`
+                    : '';
+                return `<div class="expense-row" onclick="editFixed(${pi},${ei})">
+                    <div class="exp-icon" ${iconClick ? `onclick="${iconClick}"` : ''}
+                        style="${e.custom ? 'cursor:pointer;' : ''}">${e.emoji}</div>
+                    <div class="exp-info">
+                        <div class="exp-name">${e.name}</div>
+                        <div class="exp-pct">${pct}%</div>
+                    </div>
+                    <div class="exp-amount">${fmt(e.amount)}</div>
+                </div>`;
+            }).join('')}
+            <button class="add-btn" style="border-color:${p.color}55;color:${p.color};margin-top:6px;margin-bottom:18px" onclick="addFixed(${pi})">+ Agregar Gasto Fijo</button>
+            <div class="divider" style="margin-top:0"></div>
+        `;
+    }
+
+    const othersHTML = m.otherExpenses.map((e, ei) => `
+        <div class="other-row">
+            <div class="other-name" onclick="editOther(${pi},${ei})">${e.name}</div>
+            <div class="other-amt" onclick="editOther(${pi},${ei})">${fmt(e.amount)}</div>
+            <button class="del-btn" onclick="deleteOther(${pi},${ei})">×</button>
+        </div>
+    `).join('');
+
+    return `
+        <div class="month-header">
+            <div class="month-selector">
+                <button class="month-arrow" onclick="changeMonth(${pi},-1)">◀</button>
+                <div class="month-label">${m.name} ${currentYear}</div>
+                <button class="month-arrow" onclick="changeMonth(${pi},1)">▶</button>
+            </div>
+            <div class="balance-block">
+                <div class="balance-lbl">${p.isSavings ? 'Total Acumulado' : 'Balance'}</div>
+                <div class="balance-num" style="color:${balColor}">${fmt(t.bal)}</div>
+                <div class="balance-change" style="color:${changeColor}">${changeStr}</div>
+            </div>
+            ${p.isSavings ? `
+                <div class="stat-card" style="margin-bottom:12px">
+                    <div class="stat-lbl">Aporte del Mes</div>
+                    <div class="stat-val">${fmt(t.inc)}</div>
+                    <div class="stat-bar"><div class="stat-bar-fill" style="width:100%;background:${p.color}"></div></div>
+                </div>
+            ` : `
+                <div class="stats-row">
+                    <div class="stat-card">
+                        <div class="stat-lbl">Ingresos</div>
+                        <div class="stat-val">${fmt(t.inc)}</div>
+                        <div class="stat-bar"><div class="stat-bar-fill" style="width:100%;background:${p.color}"></div></div>
+                    </div>
+                    <div class="stat-card">
+                        <div class="stat-lbl">Gastos</div>
+                        <div class="stat-val">${fmt(t.exp)}</div>
+                        <div class="stat-bar"><div class="stat-bar-fill" style="width:${expPct}%;background:${p.color}"></div></div>
+                    </div>
+                </div>
+                <div class="savings-card" style="background:${p.gradient || p.color};background-size:100% 100%">
+                    <div>
+                        <div class="stat-lbl" style="color:rgba(255,255,255,0.7)">Tasa Ahorro</div>
+                        <div class="savings-pct" style="color:white">${t.rate.toFixed(0)}%</div>
+                    </div>
+                    <div class="savings-amt" style="color:rgba(255,255,255,0.85)">${fmt(t.bal)}</div>
+                </div>
+            `}
+        </div>
+        <div class="content">
+            <div class="section-hdr">
+                <div class="section-title">${p.isSavings ? 'Aportes' : 'Ingresos'}</div>
+                <div class="section-total" style="color:${p.color}">${fmt(t.inc)}</div>
+            </div>
+            ${m.incomes.length > 0 ? m.incomes.map((inc, ii) => `
+                <div class="other-row">
+                    <div class="other-name" onclick="editIncome(${pi},${ii})">${inc.name}</div>
+                    <div class="other-amt" onclick="editIncome(${pi},${ii})">${fmt(inc.amount)}</div>
+                    <button class="del-btn" onclick="deleteIncome(${pi},${ii})">×</button>
+                </div>
+            `).join('') : `<div class="empty">${p.isSavings ? 'Sin aportes registrados' : 'Sin ingresos registrados'}</div>`}
+            <button class="add-btn" style="border-color:${p.color}33;color:${p.color}" onclick="addIncome(${pi})">+ Agregar ${p.isSavings ? 'Aporte' : 'Ingreso'}</button>
+            ${p.isSavings ? '' : `
+                <div class="divider"></div>
+                ${fixedHTML}
+                <div class="section-hdr">
+                    <div class="section-title">${p.hasFixed ? 'Otros Gastos' : 'Gastos'}</div>
+                    <div class="section-total" style="color:${p.color}">${fmt(t.oth)}</div>
+                </div>
+                ${othersHTML.length > 0 ? othersHTML : '<div class="empty">Sin gastos registrados</div>'}
+                <button class="add-btn" style="border-color:${p.color}33;color:${p.color}" onclick="addOther(${pi})">+ Agregar Gasto</button>
+            `}
+        </div>
+    `;
+}
+
+function buildAnnual(p, pi) {
+    let totalInc = 0, totalExp = 0;
+    const balances = [];
+
+    MONTHS.forEach((_, mi) => {
+        const t = calc(p.id, mi);
+        totalInc += t.inc;
+        totalExp += t.exp;
+        balances.push(t.bal);
+    });
+
+    const totalSav = totalInc - totalExp;
+    const avg = totalSav / 12;
+
+    const maxAbs = Math.max(...balances.map(Math.abs), 1);
+
+    const barsHTML = balances.map((bal, mi) => {
+        const h = Math.abs(bal) / maxAbs * 100;
+        const color = bal >= 0 ? (p.gradient || p.color) : 'var(--negative)';
+        return `<div class="bar" style="height:${h}%;background:${color};align-self:${bal >= 0 ? 'flex-end' : 'flex-start'}">
+            <div class="bar-lbl">${MONTHS[mi][0]}</div>
+        </div>`;
+    }).join('');
+
+    const tableRows = MONTHS.map((name, mi) => {
+        const t = calc(p.id, mi);
+        const cls = t.bal >= 0 ? 'pos' : 'neg';
+        return `<div class="t-row">
+            <div class="t-cell">${name}</div>
+            <div class="t-cell">${fmt(t.inc)}</div>
+            <div class="t-cell">${fmt(t.exp)}</div>
+            <div class="t-cell ${cls}">${fmt(t.bal)}</div>
+        </div>`;
+    }).join('');
+
+    return `
+        <div class="annual-hdr">
+            <div class="annual-title" style="background:${p.gradient || p.color};-webkit-background-clip:text;background-clip:text;-webkit-text-fill-color:transparent;">${p.emoji} ${currentYear}</div>
+            <div class="annual-grid">
+                <div class="annual-card">
+                    <div class="annual-lbl">Total Ingresos</div>
+                    <div class="annual-val">${fmt(totalInc)}</div>
+                </div>
+                <div class="annual-card">
+                    <div class="annual-lbl">Total Gastos</div>
+                    <div class="annual-val">${fmt(totalExp)}</div>
+                </div>
+                <div class="annual-card" style="background:${p.gradient || p.color}">
+                    <div class="annual-lbl" style="color:rgba(255,255,255,0.85)">Ahorro Total</div>
+                    <div class="annual-val" style="color:white">${fmt(totalSav)}</div>
+                </div>
+                <div class="annual-card">
+                    <div class="annual-lbl">Promedio Mes</div>
+                    <div class="annual-val">${fmt(avg)}</div>
+                </div>
+            </div>
+        </div>
+        <div class="chart-section">
+            <div class="chart-title">Balance Mensual</div>
+            <div class="chart-wrap">
+                <div class="bar-chart">${barsHTML}</div>
+            </div>
+            <div class="chart-title">Detalle</div>
+            <div class="table-wrap">
+                <div class="t-row t-head">
+                    <div>Mes</div><div>Ingresos</div><div>Gastos</div><div>Balance</div>
+                </div>
+                ${tableRows}
+            </div>
+        </div>
+    `;
+}
+
+// ─── NAVIGATION ──────────────────────────────────────────────────────
+function switchProfile(pi) {
+    currentProfile = pi;
+    updateSwipe();
+    updatePills();
+}
+
+function updateSwipe() {
+    document.getElementById('swipeContainer').style.transform = `translateX(-${currentProfile * 25}%)`;
+    document.querySelectorAll('.dot').forEach((d, i) => {
+        d.className = 'dot' + (i === currentProfile ? ' active' : '');
+        d.style.background = i === currentProfile ? PROFILES[i].color : '';
+    });
+}
+
+function updatePills() {
+    document.querySelectorAll('.profile-pill').forEach((p, i) => {
+        p.className = 'profile-pill' + (i === currentProfile ? ' active' : '');
+    });
+}
+
+function switchTab(pi, tab) {
+    activeTab[pi] = tab;
+    const screen = document.getElementById(`screen-${pi}`);
+    screen.innerHTML = buildScreen(PROFILES[pi], pi);
+}
+
+function changeMonth(pi, dir) {
+    currentMonths[pi] = (currentMonths[pi] + dir + 12) % 12;
+    refreshMonthly(pi);
+}
+
+function refreshMonthly(pi) {
+    const screen = document.getElementById(`screen-${pi}`);
+    screen.innerHTML = buildScreen(PROFILES[pi], pi);
+}
+
+// ─── SWIPE GESTURE ───────────────────────────────────────────────────
+let touchStartX = 0, touchStartY = 0, isSwiping = false;
+
+document.getElementById('swipeContainer').addEventListener('touchstart', e => {
+    touchStartX = e.touches[0].clientX;
+    touchStartY = e.touches[0].clientY;
+    isSwiping = false;
+}, { passive: true });
+
+document.getElementById('swipeContainer').addEventListener('touchmove', e => {
+    const dx = e.touches[0].clientX - touchStartX;
+    const dy = e.touches[0].clientY - touchStartY;
+    if (!isSwiping && Math.abs(dy) > Math.abs(dx)) return;
+    if (Math.abs(dx) > 10) isSwiping = true;
+}, { passive: true });
+
+document.getElementById('swipeContainer').addEventListener('touchend', e => {
+    if (!isSwiping) return;
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    const dy = Math.abs(e.changedTouches[0].clientY - touchStartY);
+    if (Math.abs(dx) > 50 && dy < 80) {
+        if (dx < 0 && currentProfile < PROFILES.length - 1) switchProfile(currentProfile + 1);
+        else if (dx > 0 && currentProfile > 0) switchProfile(currentProfile - 1);
+    }
+}, { passive: true });
+
+// ─── MODAL ────────────────────────────────────────────────────────────
+
+function editFixed(pi, ei) {
+    const p = PROFILES[pi];
+    const e = appData[p.id].months[currentMonths[pi]].fixedExpenses[ei];
+    modalCtx = { type: 'edit-fixed', pi, ei, selectedEmoji: e.emoji };
+    document.getElementById('modalTitle').textContent = '✏️ Editar Gasto Fijo';
+    document.getElementById('modalSave').style.background = p.color;
+    
+    // Si es custom, permitir editar todo; si no, solo el monto
+    if (e.custom) {
+        document.getElementById('modalInputs').innerHTML = `
+            <div style="margin-bottom:12px;">
+                <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">Emoji</div>
+                <div style="display:flex;gap:8px;flex-wrap:wrap;margin-bottom:12px;">
+                    ${['🏠','⚡','💧','📡','🛒','🏢','📱','📞','🥬','🥕','📺','☁️','📦','💧','🥚','🚗','🏍️','⛽','🏥','💊','🐶','🐱','🏫','📚','🎒','✈️','🚌','⚽','🎵','📷','❤️','⭐'].map(em => `
+                        <div class="emoji-opt ${em === e.emoji ? 'selected' : ''}" onclick="selectEmoji('${em}')" style="width:36px;height:36px;border-radius:8px;background:rgba(255,255,255,0.05);border:2px solid ${em === e.emoji ? p.color : 'transparent'};display:flex;align-items:center;justify-content:center;font-size:18px;cursor:pointer;">${em}</div>
+                    `).join('')}
+                </div>
+            </div>
+            <input class="modal-input modal-input-sm" id="inp-name" type="text" placeholder="Nombre" value="${e.name}" style="margin-bottom:12px;">
+            <input class="modal-input" id="inp-amt" type="text" placeholder="0" value="${e.amount || ''}" inputmode="numeric">
+        `;
+    } else {
+        document.getElementById('modalInputs').innerHTML = `
+            <div style="text-align:center;margin-bottom:16px;">
+                <div style="font-size:40px;margin-bottom:8px">${e.emoji}</div>
+                <div style="font-size:15px;color:rgba(255,255,255,0.7);font-weight:500">${e.name}</div>
+            </div>
+            <input class="modal-input" id="inp-amt" type="text" placeholder="0" value="${e.amount || ''}" inputmode="numeric">
+        `;
+    }
+    
+    document.getElementById('modal').classList.add('show');
+    setupFormattedInput('inp-amt');
+    setTimeout(() => { 
+        const focusField = e.custom ? document.getElementById('inp-name') : document.getElementById('inp-amt');
+        if (focusField) focusField.focus();
+    }, 100);
+}
+
+function editOther(pi, ei) {
+    const p = PROFILES[pi];
+    const e = appData[p.id].months[currentMonths[pi]].otherExpenses[ei];
+    modalCtx = { type: 'edit-other', pi, ei };
+    document.getElementById('modalTitle').textContent = '✏️ Editar Gasto';
+    document.getElementById('modalSave').style.background = p.color;
+    document.getElementById('modalInputs').innerHTML = `
+        <input class="modal-input modal-input-sm" id="inp-name" type="text" placeholder="Nombre" value="${e.name}" style="margin-bottom:12px;">
+        <input class="modal-input" id="inp-amt" type="text" placeholder="Monto" value="${e.amount || ''}" inputmode="numeric">
+    `;
+    document.getElementById('modal').classList.add('show');
+    setupFormattedInput('inp-amt');
+    setTimeout(() => { const i = document.getElementById('inp-name'); i.focus(); }, 100);
+}
+
+function addOther(pi) {
+    const p = PROFILES[pi];
+    modalCtx = { type: 'add-other', pi };
+    document.getElementById('modalTitle').textContent = '+ Nuevo Gasto';
+    document.getElementById('modalSave').style.background = p.color;
+    document.getElementById('modalInputs').innerHTML = `
+        <input class="modal-input modal-input-sm" id="inp-name" type="text" placeholder="Nombre del gasto">
+        <input class="modal-input" id="inp-amt" type="text" placeholder="Monto" inputmode="numeric">
+    `;
+    document.getElementById('modal').classList.add('show');
+    setupFormattedInput('inp-amt');
+    setTimeout(() => document.getElementById('inp-name').focus(), 100);
+}
+
+function deleteOther(pi, ei) {
+    if (!confirm('¿Eliminar este gasto?')) return;
+    appData[PROFILES[pi].id].months[currentMonths[pi]].otherExpenses.splice(ei, 1);
+    save();
+    refreshMonthly(pi);
+}
+
+// ─── INCOME MANAGEMENT ───────────────────────────────────────────────
+function addIncome(pi) {
+    const p = PROFILES[pi];
+    modalCtx = { type: 'add-income', pi };
+    document.getElementById('modalTitle').textContent = '+ Nuevo Ingreso';
+    document.getElementById('modalSave').style.background = p.color;
+    document.getElementById('modalInputs').innerHTML = `
+        <input class="modal-input modal-input-sm" id="inp-name" type="text" placeholder="Nombre del ingreso (ej: Salario, Freelance)">
+        <input class="modal-input" id="inp-amt" type="text" placeholder="Monto" inputmode="numeric">
+    `;
+    document.getElementById('modal').classList.add('show');
+    setupFormattedInput('inp-amt');
+    setTimeout(() => document.getElementById('inp-name').focus(), 100);
+}
+
+function editIncome(pi, ii) {
+    const p = PROFILES[pi];
+    const inc = appData[p.id].months[currentMonths[pi]].incomes[ii];
+    modalCtx = { type: 'edit-income', pi, ii };
+    document.getElementById('modalTitle').textContent = '✏️ Editar Ingreso';
+    document.getElementById('modalSave').style.background = p.color;
+    document.getElementById('modalInputs').innerHTML = `
+        <input class="modal-input modal-input-sm" id="inp-name" type="text" placeholder="Nombre" value="${inc.name}">
+        <input class="modal-input" id="inp-amt" type="text" placeholder="0" value="${inc.amount || ''}" inputmode="numeric">
+    `;
+    document.getElementById('modal').classList.add('show');
+    setupFormattedInput('inp-amt');
+    setTimeout(() => document.getElementById('inp-name').focus(), 100);
+}
+
+function deleteIncome(pi, ii) {
+    if (!confirm('¿Eliminar este ingreso?')) return;
+    appData[PROFILES[pi].id].months[currentMonths[pi]].incomes.splice(ii, 1);
+    save();
+    refreshMonthly(pi);
+}
+
+
+const FIXED_EMOJIS = [
+    // Casa y servicios
+    '🏠','🏢','🏘️','🔑','🛏️','🛋️','🚪','🪟',
+    // Utilities
+    '⚡','💡','💧','🔥','🌐','📡','📱','📞','☁️','📦',
+    // Comida y cocina
+    '🍽️','🥘','🍳','🥗','🍕','🍔','🍟','🌮','🌯','🥙','🍱','🍜','🍲','🥟','🍛','🍝','🥫',
+    '🍞','🥖','🥐','🧀','🥚','🍖','🍗','🥓','🌭','🥩','🍤','🐟','🦐','🦞',
+    '🥬','🥦','🥒','🥕','🌽','🥔','🍅','🫑','🧄','🧅','🥜','🌰',
+    '🍎','🍊','🍋','🍌','🍉','🍇','🍓','🫐','🍒','🍑','🥭','🍍','🥥','🥝',
+    '🍰','🎂','🧁','🍪','🍩','🍮','🍯','🥛','☕','🧃','🥤','🍷','🍺','🧊',
+    // Compras
+    '🛒','🛍️','💳','💰','💵','💴','🏪','🏬',
+    // Transporte
+    '🚗','🚕','🚙','🚌','🚎','🚇','🚊','🚝','🚄','✈️','🚁','⛽','🅿️','🛣️','🏍️','🚲','🛴',
+    // Salud
+    '🏥','💊','💉','🩺','🩹','🦷','👁️','🧬','🔬',
+    // Mascotas
+    '🐶','🐱','🐭','🐹','🐰','🦊','🐻','🐼','🐨','🐯','🦁','🐮','🐷','🐸','🐵','🐔','🐧','🐦','🐤','🦆','🦉','🐺','🐗','🐴','🦄','🐝','🪰','🦋','🐌','🐞','🐜','🪲','🦗','🕷️','🦂','🐢','🐍','🦎','🦖','🦕','🐙','🦑','🦐','🦞','🦀','🐡','🐠','🐟','🐬','🐳','🐋','🦈','🐊','🐅','🐆','🦓','🦍','🦧','🦣','🐘','🦛','🦏','🐪','🐫','🦒','🦘','🦬','🐃','🐂','🐄','🐎','🐖','🐏','🐑','🦙','🐐','🦌','🐕','🐩','🦮','🐕‍🦺','🐈','🐈‍⬛','🪶','🐓','🦃','🦤','🦚','🦜','🦢','🦩','🕊️','🐇','🦝','🦨','🦡','🦫','🦦','🦥','🐁','🐀','🐿️','🦔','🐾','🐉','🐲',
+    // Educación
+    '🏫','📚','📖','📝','✏️','✒️','🖊️','🖍️','📏','📐','🎒','🎓','🧑‍🎓','👨‍🏫',
+    // Ropa y accesorios
+    '👕','👔','👗','👘','🥻','🩱','👙','👚','👛','👜','👝','🎒','👞','👟','🥾','🥿','👠','👡','👢','👑','👒','🎩','🎓','🧢','⛑️','📿','💄','💍','💎','🕶️','👓','🥽','🥼','🦺','👗','👘','🥻','🩱','👙','🧥','🧤','🧣','🧦','🩴','🥾',
+    // Entretenimiento
+    '🎬','🎥','📺','📻','🎙️','🎚️','🎛️','🎧','📢','📣','🎵','🎶','🎤','🎹','🥁','🪘','🎷','🎺','🪗','🎸','🪕','🎻','🪈','🎮','🕹️','🎯','🎲','🎰','🎳','🏀','⚽','⚾','🥎','🎾','🏐','🏈','🏉','🥏','🎱','🪀','🪁','🏏','🏑','🏒','🥍','🏓','🏸','🥊','🥋','🥅','⛳','⛸️','🎣','🤿','🎿','🛷','🥌',
+    // Trabajo y oficina
+    '💼','📁','📂','🗂️','📅','📆','🗓️','📇','📈','📉','📊','📋','📌','📍','📎','🖇️','📏','📐','✂️','🗃️','🗄️','🗑️','🖥️','🖨️','⌨️','🖱️','🖲️','💾','💿','📀',
+    // Limpieza y hogar
+    '🧹','🧺','🧻','🧼','🪣','🧽','🧴','🪠','🪥','🪒','🧷','🪡','🧵','🪢','🧶','🪢','🛁','🚿','🚽','🪠',
+    // Otros útiles
+    '📬','📫','📪','📭','📮','✉️','📧','📨','📩','📤','📥','⏰','⏱️','⏲️','🕐','💝','🎁','🎀','🎊','🎉','🎈','🔔','🔕','🎗️','❤️','💚','💙','💜','🧡','💛','🤍','🖤','💔','❣️','💕','💞','💓','💗','💖','💘','💝','⭐','🌟','✨','💫','🔥','💧','💨','☀️','🌙','⭐','🌈','☁️','⛅','🌤️','🌥️','🌦️','🌧️','⛈️','🌩️','🌨️'
+];
+
+// Diccionario de sugerencias por palabras clave
+const EMOJI_SUGGESTIONS = {
+    // Bebé / Niños
+    'bebe': '👶', 'bebé': '👶', 'baby': '👶', 'niño': '👦', 'niña': '👧', 'hijo': '👦', 'hija': '👧',
+    'pañal': '🍼', 'panal': '🍼', 'leche': '🍼', 'formula': '🍼', 'fórmula': '🍼', 'cuna': '🛏️',
+    'guarderia': '🏫', 'guardería': '🏫', 'jardin': '🏫', 'jardín': '🏫',
+    // Auto / Transporte
+    'auto': '🚗', 'carro': '🚗', 'coche': '🚗', 'moto': '🏍️', 'bici': '🚴', 'bicicleta': '🚴',
+    'gasolina': '⛽', 'bencina': '⛽', 'combustible': '⛽', 'peaje': '🛣️', 'seguro': '🛡️',
+    'mecanico': '🔧', 'mecánico': '🔧', 'taller': '🔧', 'revision': '🔧', 'revisión': '🔧',
+    'bus': '🚌', 'metro': '🚇', 'taxi': '🚕', 'uber': '🚕', 'transporte': '🚌',
+    // Mascotas
+    'perro': '🐶', 'gato': '🐱', 'mascota': '🐾', 'veterinario': '🐾', 'veterinaria': '🐾',
+    'vet': '🐾', 'pienso': '🦴', 'comida perro': '🦴', 'comida gato': '🐟',
+    // Salud
+    'medico': '🏥', 'médico': '🏥', 'doctor': '🏥', 'hospital': '🏥', 'clinica': '🏥', 'clínica': '🏥',
+    'medicamento': '💊', 'remedio': '💊', 'farmacia': '💊', 'dentista': '🦷', 'diente': '🦷',
+    'gym': '🏋️', 'gimnasio': '🏋️', 'deporte': '⚽', 'yoga': '🧘', 'sicólogo': '🧠', 'psicologo': '🧠',
+    // Educación
+    'colegio': '🏫', 'escuela': '🏫', 'universidad': '🎓', 'uni': '🎓', 'curso': '📚',
+    'libro': '📚', 'libros': '📚', 'cuaderno': '📓', 'utiles': '✏️', 'útiles': '✏️',
+    // Comida
+    'mercado': '🛒', 'supermercado': '🛒', 'feria': '🥬', 'restaurant': '🍽️', 'restaurante': '🍽️',
+    'almuerzo': '🍽️', 'comida': '🍽️', 'cafe': '☕', 'café': '☕', 'pizza': '🍕',
+    // Hogar
+    'arriendo': '🏠', 'alquiler': '🏠', 'hipoteca': '🏠', 'condominio': '🏢',
+    'luz': '💡', 'electricidad': '⚡', 'agua': '💧', 'gas': '🔥', 'internet': '🌐',
+    'limpieza': '🧹', 'aseo': '🧹', 'lavanderia': '🧺', 'lavandería': '🧺',
+    // Entretenimiento
+    'netflix': '📺', 'spotify': '🎵', 'musica': '🎵', 'música': '🎵', 'cine': '🎬',
+    'juego': '🎮', 'videojuego': '🎮', 'viaje': '✈️', 'vacaciones': '🌴',
+    // Ropa / Personal
+    'ropa': '👕', 'calzado': '👟', 'zapatos': '👟', 'peluqueria': '💈', 'peluquería': '💈',
+    'salon': '💅', 'salón': '💅', 'belleza': '💅',
+    // Familia
+    'mama': '❤️', 'mamá': '❤️', 'papa': '❤️', 'papá': '❤️', 'remesa': '📬', 'envio': '📬', 'envío': '📬',
+    // Ahorros / Finanzas
+    'ahorro': '💰', 'inversion': '📈', 'inversión': '📈', 'credito': '💳', 'crédito': '💳',
+    'deuda': '💳', 'prestamo': '💰', 'préstamo': '💰',
+    // Servicios
+    'telefono': '📱', 'teléfono': '📱', 'movil': '📱', 'móvil': '📱', 'plan': '📱',
+    'suscripcion': '📲', 'suscripción': '📲', 'streaming': '📺',
+};
+
+function suggestEmoji(text) {
+    const lower = text.toLowerCase().trim();
+    if (!lower) return null;
+    // Buscar coincidencia exacta o parcial
+    for (const [key, emoji] of Object.entries(EMOJI_SUGGESTIONS)) {
+        if (lower.includes(key) || key.includes(lower)) return emoji;
+    }
+    return null;
+}
+
+function addFixed(pi) {
+    const p = PROFILES[pi];
+    modalCtx = { type: 'add-fixed', pi, selectedEmoji: '📌' };
+    document.getElementById('modalTitle').textContent = '+ Nuevo Gasto Fijo';
+    document.getElementById('modalSave').style.background = p.color;
+    document.getElementById('modalInputs').innerHTML = `
+        <div id="suggestion-box" style="
+            display:none;
+            background:rgba(255,255,255,0.06);
+            border:1px solid rgba(255,255,255,0.1);
+            border-radius:11px;
+            padding:12px 14px;
+            margin-bottom:12px;
+            display:none;
+            align-items:center;
+            gap:12px;
+            cursor:pointer;
+        " onclick="applySuggestion()">
+            <span id="suggestion-emoji" style="font-size:28px">📌</span>
+            <div>
+                <div style="font-size:11px;color:rgba(255,255,255,0.4);margin-bottom:2px;text-transform:uppercase;letter-spacing:1px">Sugerido</div>
+                <div id="suggestion-label" style="font-size:14px;color:white;font-weight:500">Toca para usar</div>
+            </div>
+            <div style="margin-left:auto;font-size:20px">✓</div>
+        </div>
+        <input class="modal-input modal-input-sm" id="inp-name" type="text" 
+            placeholder="Ej: Bebé, Auto, Colegio..." 
+            oninput="onNameInput(this.value)">
+        <div style="font-size:11px;color:rgba(255,255,255,0.3);margin-bottom:12px;margin-top:-6px;padding-left:4px">
+            O elige un emoji manualmente:
+        </div>
+        <div class="emoji-grid" id="emojiGrid">
+            ${FIXED_EMOJIS.map(em => `
+                <div class="emoji-opt" onclick="selectEmoji('${em}')">${em}</div>
+            `).join('')}
+        </div>
+    `;
+    document.getElementById('modal').classList.add('show');
+    setTimeout(() => document.getElementById('inp-name').focus(), 100);
+}
+
+function onNameInput(value) {
+    const suggested = suggestEmoji(value);
+    const box = document.getElementById('suggestion-box');
+    if (suggested && value.length > 1) {
+        document.getElementById('suggestion-emoji').textContent = suggested;
+        document.getElementById('suggestion-label').textContent = `Usar ${suggested} para "${value}"`;
+        box.style.display = 'flex';
+        // Pre-seleccionar en el grid también
+        document.querySelectorAll('.emoji-opt').forEach(el => {
+            el.classList.toggle('selected', el.textContent === suggested);
+        });
+        modalCtx.selectedEmoji = suggested;
+    } else {
+        box.style.display = 'none';
+    }
+}
+
+function applySuggestion() {
+    const suggested = document.getElementById('suggestion-emoji').textContent;
+    selectEmoji(suggested);
+    // Highlight visual
+    const box = document.getElementById('suggestion-box');
+    box.style.borderColor = 'var(--positive)';
+    setTimeout(() => box.style.borderColor = 'rgba(255,255,255,0.1)', 600);
+}
+
+function selectEmoji(em) {
+    modalCtx.selectedEmoji = em;
+    document.querySelectorAll('.emoji-opt').forEach(el => {
+        el.classList.toggle('selected', el.textContent === em);
+    });
+}
+
+function iconMenu(pi, ei) {
+    const p = PROFILES[pi];
+    const e = appData[p.id].months[currentMonths[pi]].fixedExpenses[ei];
+
+    // Bottom sheet elegante
+    const sheet = document.createElement('div');
+    sheet.id = 'iconSheet';
+    sheet.style.cssText = `
+        position:fixed;inset:0;z-index:600;
+        background:rgba(0,0,0,0.7);
+        display:flex;align-items:flex-end;
+        backdrop-filter:blur(4px);
+    `;
+    sheet.innerHTML = `
+        <div style="
+            width:100%;background:#1a2a3a;
+            border-radius:20px 20px 0 0;
+            padding:20px;
+            animation: slideUp 0.25s ease;
+        ">
+            <div style="text-align:center;margin-bottom:20px;">
+                <div style="font-size:40px;margin-bottom:8px">${e.emoji}</div>
+                <div style="font-size:16px;font-weight:600;color:white">${e.name}</div>
+            </div>
+            <button onclick="changeEmojiModal(${pi},${ei})" style="
+                width:100%;padding:16px;margin-bottom:10px;
+                background:rgba(255,255,255,0.07);
+                border:1px solid rgba(255,255,255,0.1);
+                border-radius:13px;color:white;
+                font-size:15px;font-weight:500;cursor:pointer;
+                display:flex;align-items:center;gap:12px;
+            ">
+                <span style="font-size:22px">🎨</span> Cambiar emoji
+            </button>
+            <button onclick="deleteFixed(${pi},${ei})" style="
+                width:100%;padding:16px;margin-bottom:10px;
+                background:rgba(255,69,96,0.12);
+                border:1px solid rgba(255,69,96,0.25);
+                border-radius:13px;color:#ff4560;
+                font-size:15px;font-weight:500;cursor:pointer;
+                display:flex;align-items:center;gap:12px;
+            ">
+                <span style="font-size:22px">🗑️</span> Eliminar gasto fijo
+            </button>
+            <button onclick="document.getElementById('iconSheet').remove()" style="
+                width:100%;padding:14px;
+                background:transparent;border:none;
+                color:rgba(255,255,255,0.4);font-size:15px;cursor:pointer;
+            ">Cancelar</button>
+        </div>
+    `;
+    sheet.onclick = (e) => { if (e.target === sheet) sheet.remove(); };
+    document.body.appendChild(sheet);
+}
+
+function changeEmojiModal(pi, ei) {
+    document.getElementById('iconSheet')?.remove();
+    const p = PROFILES[pi];
+    const e = appData[p.id].months[currentMonths[pi]].fixedExpenses[ei];
+    modalCtx = { type: 'change-emoji', pi, ei, selectedEmoji: e.emoji };
+    document.getElementById('modalTitle').textContent = `${e.emoji} Cambiar emoji`;
+    document.getElementById('modalSave').style.background = p.color;
+    document.getElementById('modalInputs').innerHTML = `
+        <div class="emoji-grid" id="emojiGrid">
+            ${FIXED_EMOJIS.map(em => `
+                <div class="emoji-opt ${em === e.emoji ? 'selected' : ''}" onclick="selectEmoji('${em}')">${em}</div>
+            `).join('')}
+        </div>
+    `;
+    document.getElementById('modal').classList.add('show');
+}
+
+function deleteFixed(pi, ei) {
+    document.getElementById('iconSheet')?.remove();
+    if (!confirm('¿Eliminar este gasto fijo de todos los meses?')) return;
+    const pid = PROFILES[pi].id;
+    appData[pid].months.forEach(m => m.fixedExpenses.splice(ei, 1));
+    save();
+    refreshMonthly(pi);
+}
+
+function saveModal() {
+    if (!modalCtx) return;
+    const { type, pi, ei, ii } = modalCtx;
+    const p = PROFILES[pi];
+    const m = appData[p.id].months[currentMonths[pi]];
+
+    if (type === 'add-income') {
+        const name = document.getElementById('inp-name').value.trim();
+        const amount = parseInputValue(document.getElementById('inp-amt'));
+        if (name) m.incomes.push({ name, amount });
+    } else if (type === 'edit-income') {
+        const name = document.getElementById('inp-name').value.trim();
+        const amount = parseInputValue(document.getElementById('inp-amt'));
+        if (name) {
+            m.incomes[ii].name = name;
+            m.incomes[ii].amount = amount;
+        }
+    } else if (type === 'fixed') {
+        m.fixedExpenses[ei].amount = parseInputValue(document.getElementById('inp-amt'));
+    } else if (type === 'edit-fixed') {
+        // Editar gasto fijo (nombre, emoji, monto)
+        const e = m.fixedExpenses[ei];
+        if (e.custom) {
+            const newName = document.getElementById('inp-name')?.value.trim();
+            const newEmoji = modalCtx.selectedEmoji;
+            const newAmount = parseInputValue(document.getElementById('inp-amt'));
+            if (newName) {
+                // Actualizar en TODOS los meses
+                appData[PROFILES[pi].id].months.forEach(month => {
+                    if (month.fixedExpenses[ei]) {
+                        month.fixedExpenses[ei].name = newName;
+                        month.fixedExpenses[ei].emoji = newEmoji;
+                    }
+                });
+                // Actualizar monto solo en el mes actual
+                e.amount = newAmount;
+            }
+        } else {
+            // Si no es custom, solo editar monto
+            e.amount = parseInputValue(document.getElementById('inp-amt'));
+        }
+    } else if (type === 'other') {
+        m.otherExpenses[ei].amount = parseInputValue(document.getElementById('inp-amt'));
+    } else if (type === 'edit-other') {
+        // Editar otro gasto (nombre Y monto)
+        const newName = document.getElementById('inp-name').value.trim();
+        const newAmount = parseInputValue(document.getElementById('inp-amt'));
+        if (newName) {
+            m.otherExpenses[ei].name = newName;
+            m.otherExpenses[ei].amount = newAmount;
+        }
+    } else if (type === 'add-other') {
+        const name = document.getElementById('inp-name').value.trim();
+        const amount = parseInputValue(document.getElementById('inp-amt'));
+        if (name) m.otherExpenses.push({ name, amount });
+    } else if (type === 'add-fixed') {
+        const name = document.getElementById('inp-name').value.trim();
+        const emoji = modalCtx.selectedEmoji || '📌';
+        if (name) {
+            appData[PROFILES[pi].id].months.forEach(month => {
+                month.fixedExpenses.push({ emoji, name, amount: 0, custom: true });
+            });
+        }
+    } else if (type === 'change-emoji') {
+        const newEmoji = modalCtx.selectedEmoji;
+        // Cambiar emoji en todos los meses
+        appData[PROFILES[pi].id].months.forEach(month => {
+            if (month.fixedExpenses[ei]) {
+                month.fixedExpenses[ei].emoji = newEmoji;
+            }
+        });
+    }
+
+    save();
+    closeModal();
+    refreshMonthly(pi);
+}
+
+function closeModal(e) {
+    if (e && e.target !== document.getElementById('modal')) return;
+    document.getElementById('modal').classList.remove('show');
+    modalCtx = null;
+}
+
+// Enter to save
+document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && document.getElementById('modal').classList.contains('show')) saveModal();
+    if (e.key === 'Escape') closeModal();
+});
+
+// ─── INIT ─────────────────────────────────────────────────────────────
+// ─── INIT ─────────────────────────────────────────────────────────────
+buildUI();
+
+// ─── SETTINGS ─────────────────────────────────────────────────────────
+function openSettings() {
+    const sheet = document.createElement('div');
+    sheet.id = 'settingsSheet';
+    sheet.style.cssText = `
+        position:fixed;inset:0;z-index:600;
+        background:rgba(0,0,0,0.75);
+        display:flex;align-items:flex-end;
+        backdrop-filter:blur(6px);
+    `;
+    sheet.innerHTML = `
+        <div style="
+            width:100%;background:#1a2a3a;
+            border-radius:20px 20px 0 0;
+            padding:24px 20px;
+            animation: slideUp 0.3s ease;
+            max-height:70vh;
+            overflow-y:auto;
+        ">
+            <div style="text-align:center;margin-bottom:24px;">
+                <div style="font-size:22px;font-weight:600;color:white;margin-bottom:6px">⚙️ Configuración</div>
+                <div style="font-size:13px;color:rgba(255,255,255,0.4)">Gestiona tus datos</div>
+            </div>
+            
+            <button onclick="exportData()" style="
+                width:100%;padding:16px;margin-bottom:12px;
+                background:rgba(59,130,246,0.15);
+                border:1px solid rgba(59,130,246,0.3);
+                border-radius:13px;color:#3b82f6;
+                font-size:15px;font-weight:600;cursor:pointer;
+                display:flex;align-items:center;gap:12px;
+            ">
+                <span style="font-size:22px">📥</span> 
+                <div style="flex:1;text-align:left;">
+                    <div>Exportar datos</div>
+                    <div style="font-size:12px;font-weight:400;opacity:0.7">Descargar backup JSON</div>
+                </div>
+            </button>
+            
+            <button onclick="importData()" style="
+                width:100%;padding:16px;margin-bottom:12px;
+                background:rgba(0,229,160,0.12);
+                border:1px solid rgba(0,229,160,0.25);
+                border-radius:13px;color:#00e5a0;
+                font-size:15px;font-weight:600;cursor:pointer;
+                display:flex;align-items:center;gap:12px;
+            ">
+                <span style="font-size:22px">📤</span> 
+                <div style="flex:1;text-align:left;">
+                    <div>Importar datos</div>
+                    <div style="font-size:12px;font-weight:400;opacity:0.7">Restaurar desde backup</div>
+                </div>
+            </button>
+            
+            <button onclick="resetData()" style="
+                width:100%;padding:16px;margin-bottom:12px;
+                background:rgba(255,69,96,0.12);
+                border:1px solid rgba(255,69,96,0.25);
+                border-radius:13px;color:#ff4560;
+                font-size:15px;font-weight:600;cursor:pointer;
+                display:flex;align-items:center;gap:12px;
+            ">
+                <span style="font-size:22px">🗑️</span> 
+                <div style="flex:1;text-align:left;">
+                    <div>Borrar todos los datos</div>
+                    <div style="font-size:12px;font-weight:400;opacity:0.7">Empezar desde cero</div>
+                </div>
+            </button>
+            
+            <div style="margin:20px 0;padding:16px;background:rgba(255,255,255,0.03);border-radius:12px;">
+                <div style="font-size:12px;color:rgba(255,255,255,0.4);margin-bottom:8px;text-transform:uppercase;letter-spacing:1px">Almacenamiento</div>
+                <div style="font-size:14px;color:rgba(255,255,255,0.7)" id="storageInfo">Calculando...</div>
+            </div>
+            
+            <button onclick="document.getElementById('settingsSheet').remove()" style="
+                width:100%;padding:14px;margin-top:12px;
+                background:transparent;border:none;
+                color:rgba(255,255,255,0.5);font-size:15px;cursor:pointer;
+            ">Cerrar</button>
+        </div>
+    `;
+    sheet.onclick = (e) => { if (e.target === sheet) sheet.remove(); };
+    document.body.appendChild(sheet);
+    
+    // Calcular tamaño de datos
+    const dataSize = new Blob([JSON.stringify(appData)]).size;
+    const sizeKB = (dataSize / 1024).toFixed(2);
+    document.getElementById('storageInfo').textContent = `${sizeKB} KB en uso`;
+}
+
+function exportData() {
+    const dataStr = JSON.stringify(appData, null, 2);
+    const blob = new Blob([dataStr], { type: 'application/json' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `gastos-backup-${new Date().toISOString().split('T')[0]}.json`;
+    a.click();
+    URL.revokeObjectURL(url);
+    document.getElementById('settingsSheet')?.remove();
+    alert('✅ Datos exportados correctamente');
+}
+
+function importData() {
+    const input = document.createElement('input');
+    input.type = 'file';
+    input.accept = '.json';
+    input.onchange = (e) => {
+        const file = e.target.files[0];
+        if (!file) return;
+        const reader = new FileReader();
+        reader.onload = (event) => {
+            try {
+                const imported = JSON.parse(event.target.result);
+                if (confirm('¿Reemplazar todos los datos actuales con el backup?')) {
+                    appData = imported;
+                    save();
+                    document.getElementById('settingsSheet')?.remove();
+                    buildUI();
+                    alert('✅ Datos importados correctamente');
+                }
+            } catch (err) {
+                alert('❌ Error: Archivo inválido');
+            }
+        };
+        reader.readAsText(file);
+    };
+    input.click();
+}
+
+function resetData() {
+    if (!confirm('⚠️ ¿BORRAR TODOS LOS DATOS?\n\nEsta acción no se puede deshacer.')) return;
+    if (!confirm('¿Estás 100% seguro? Se perderá todo.')) return;
+    localStorage.removeItem('gastos2026v2');
+    location.reload();
+}
+
+
+// ─── REGISTRAR SERVICE WORKER PARA PWA ────────────────────────────────
+if ('serviceWorker' in navigator) {
+    window.addEventListener('load', () => {
+        navigator.serviceWorker.register('./service-worker.js')
+            .then(registration => console.log('✓ Service Worker registrado'))
+            .catch(err => console.log('✗ Error registrando SW:', err));
+    });
+}
+</script>
+</body>
+</html>
